@@ -1,7 +1,7 @@
 <?php
 /**
  * An individual blog entry page type.
- * 
+ *
  * @package blog
  */
 class BlogEntry extends Page {
@@ -11,84 +11,86 @@ class BlogEntry extends Page {
 		"Author" => "Text",
 		"Tags" => "Text"
 	);
-	
+
 	private static $default_parent = 'BlogHolder';
-	
+
 	private static $can_be_root = false;
-	
+
 	private static $icon = "blog/images/blogpage-file.png";
 
 	private static $description = "An individual blog entry";
-	
+
 	private static $singular_name = 'Blog Entry Page';
-	
+
 	private static $plural_name = 'Blog Entry Pages';
-		
+
 	private static $has_one = array();
-	
+
 	private static $has_many = array();
-	
+
 	private static $many_many = array();
-	
+
 	private static $belongs_many_many = array();
-	
+
 	private static $defaults = array(
 		"ProvideComments" => true,
 		'ShowInMenus' => false
 	);
-	
+
 	/**
 	 * Is WYSIWYG editing allowed?
 	 * @var boolean
 	 */
 	static $allow_wysiwyg_editing = true;
-	
+
 	/**
 	 * Overload so that the default date is today and the default author is the logged in Member.
 	 */
 	public function populateDefaults(){
 		parent::populateDefaults();
-		
-		$this->setField('Date', date('Y-m-d H:i:s', strtotime('now')));
-		$this->setField('Author', Member::currentUser() ? Member::currentUser()->getName() : '');
+		$requestedDevBuild = (stripos(controller::curr()->request->getURL(), 'dev/build') === 0);
+		if(!$requestedDevBuild){
+			$this->setField('Date', date('Y-m-d H:i:s', strtotime('now')));
+			$this->setField('Author', Member::currentUser() ? Member::currentUser()->getName() : '');
+		}
 	}
-	
+
 	function getCMSFields() {
 		Requirements::javascript('blog/javascript/bbcodehelp.js');
 		Requirements::themedCSS('bbcodehelp');
-		
+
 		$codeparser = new BBCodeParser();
-		
+
 		SiteTree::disableCMSFieldsExtensions();
 		$fields = parent::getCMSFields();
 		SiteTree::enableCMSFieldsExtensions();
-		
+
 		if(!self::$allow_wysiwyg_editing) {
 			$fields->removeFieldFromTab("Root.Main","Content");
 			$fields->addFieldToTab("Root.Main", new TextareaField("Content", _t("BlogEntry.CN", "Content"), 20));
 		}
-		
+
 		$fields->addFieldToTab("Root.Main", $dateField = new DatetimeField("Date", _t("BlogEntry.DT", "Date")),"Content");
 		$dateField->getDateField()->setConfig('showcalendar', true);
 		$dateField->getTimeField()->setConfig('timeformat', 'H:m:s');
 		$fields->addFieldToTab("Root.Main", new TextField("Author", _t("BlogEntry.AU", "Author")),"Content");
-		
+
 		if(!self::$allow_wysiwyg_editing) {
 			$fields->addFieldToTab("Root.Main", new LiteralField("BBCodeHelper", "<div id='BBCode' class='field'>" .
 							"<a  id=\"BBCodeHint\" target='new'>" . _t("BlogEntry.BBH", "BBCode help") . "</a>" .
 							"<div id='BBTagsHolder' style='display:none;'>".$codeparser->useable_tagsHTML()."</div></div>"));
 		}
-				
+
 		$fields->addFieldToTab("Root.Main", new TextField("Tags", _t("BlogEntry.TS", "Tags (comma sep.)")),"Content");
-		
+
 		$this->extend('updateCMSFields', $fields);
-		
+
 		return $fields;
 	}
-	
+
 	/**
 	 * Safely split and parse all distinct tags assigned to this BlogEntry
-	 * 
+	 *
 	 * @return array Associative array of lowercase tag to native case tags
 	 */
 	public function TagNames() {
@@ -99,17 +101,17 @@ class BlogEntry extends Page {
 		}
 		return $results;
 	}
-	
+
 	/**
 	 * Returns the tags added to this blog entry
-	 * 
+	 *
 	 * @return ArrayList List of ArrayData with Tag, Link, and URLTag keys
 	 */
 	public function TagsCollection() {
 
 		$tags = $this->TagNames();
 		$output = new ArrayList();
-		
+
 		$link = ($parent = $this->getParent()) ? $parent->Link('tag') : '';
 		foreach($tags as $tag => $tagLabel) {
 			$urlKey = urlencode($tag);
@@ -119,11 +121,11 @@ class BlogEntry extends Page {
 				'URLTag' => $urlKey
 			)));
 		}
-		
+
 		return $output;
 	}
 
-	function Content() {	
+	function Content() {
 		if(self::$allow_wysiwyg_editing) {
 			return $this->getField('Content');
 		} else {
@@ -133,24 +135,24 @@ class BlogEntry extends Page {
 			return $content;
 		}
 	}
-	
+
 	/**
-	 * To be used by RSSFeed. If RSSFeed uses Content field, it doesn't pull in correctly parsed content. 
-	 */ 
+	 * To be used by RSSFeed. If RSSFeed uses Content field, it doesn't pull in correctly parsed content.
+	 */
 	function RSSContent() {
 		return $this->Content();
 	}
-	
+
 	/**
 	 * Get a bbcode parsed summary of the blog entry
 	 * @deprecated
 	 */
 	function ParagraphSummary(){
 		user_error("BlogEntry::ParagraphSummary() is deprecated; use BlogEntry::Content()", E_USER_NOTICE);
-		
-		$val = $this->Content(); 
-		$content = $val; 
-		
+
+		$val = $this->Content();
+		$content = $val;
+
 		if(!($content instanceof HTMLText)) {
 			$content = new HTMLText('Content');
 			$content->value = $val;
@@ -158,7 +160,7 @@ class BlogEntry extends Page {
 
 		return $content->FirstParagraph('html');
 	}
-	
+
 	/**
 	 * Get the bbcode parsed content
 	 * @deprecated
@@ -167,20 +169,20 @@ class BlogEntry extends Page {
 		user_error("BlogEntry::ParsedContent() is deprecated; use BlogEntry::Content()", E_USER_NOTICE);
 		return $this->Content();
 	}
-	
+
 	/**
 	 * Link for editing this blog entry
 	 */
 	function EditURL() {
 		return ($this->getParent()) ? $this->getParent()->Link('post') . '/' . $this->ID . '/' : false;
 	}
-	
+
 	function IsOwner() {
 		if(method_exists($this->Parent(), 'IsOwner')) {
 			return $this->Parent()->IsOwner();
 		}
 	}
-	
+
 	/**
 	 * Call this to enable WYSIWYG editing on your blog entries.
 	 * By default the blog uses BBCode
@@ -188,22 +190,22 @@ class BlogEntry extends Page {
 	static function allow_wysiwyg_editing() {
 		self::$allow_wysiwyg_editing = true;
 	}
-	
-	
+
+
 	/**
-	 * Get the previous blog entry from this section of blog pages. 
+	 * Get the previous blog entry from this section of blog pages.
 	 *
 	 * @return BlogEntry
 	 */
 	function PreviousBlogEntry() {
 		return DataObject::get_one(
-			'BlogEntry', 
-			"\"SiteTree\".\"ParentID\" = '$this->ParentID' AND \"BlogEntry\".\"Date\" < '$this->Date'", 
-			true, 
+			'BlogEntry',
+			"\"SiteTree\".\"ParentID\" = '$this->ParentID' AND \"BlogEntry\".\"Date\" < '$this->Date'",
+			true,
 			'Date DESC'
 		);
 	}
-	
+
 	/**
 	 * Get the next blog entry from this section of blog pages.
 	 *
@@ -211,11 +213,11 @@ class BlogEntry extends Page {
 	 */
 	function NextBlogEntry() {
 		return DataObject::get_one(
-			'BlogEntry', 
-			"\"SiteTree\".\"ParentID\" = '$this->ParentID' AND \"BlogEntry\".\"Date\" > '$this->Date'", 
-			true, 
+			'BlogEntry',
+			"\"SiteTree\".\"ParentID\" = '$this->ParentID' AND \"BlogEntry\".\"Date\" > '$this->Date'",
+			true,
 			'Date ASC'
-		);		
+		);
 	}
 
 	/**
@@ -224,9 +226,9 @@ class BlogEntry extends Page {
 	 * @return BlogHolder
 	 */
 	function getBlogHolder() {
-		$holder = null; 
+		$holder = null;
 		if($this->ParentID && $this->Parent()->ClassName == 'BlogHolder') {
-			$holder = $this->Parent(); 
+			$holder = $this->Parent();
 		}
 
 		return $holder;
@@ -234,7 +236,7 @@ class BlogEntry extends Page {
 }
 
 class BlogEntry_Controller extends Page_Controller {
-	
+
 	private static $allowed_actions = array(
 		'index',
 		'unpublishPost',
@@ -244,10 +246,10 @@ class BlogEntry_Controller extends Page_Controller {
 
 	function init() {
 		parent::init();
-		
+
 		Requirements::themedCSS("blog","blog");
 	}
-	
+
 	/**
 	 * Gets a link to unpublish the blog entry
 	 */
@@ -259,24 +261,24 @@ class BlogEntry_Controller extends Page_Controller {
 			);
 		} else {
 			$SQL_id = (int) $this->ID;
-	
+
 			$page = DataObject::get_by_id('SiteTree', $SQL_id);
 			$page->deleteFromStage('Live');
 			$page->flushCache();
 
 			$this->redirect($this->getParent()->Link());
-		}		
+		}
 	}
-	
+
 	/**
 	 * Temporary workaround for compatibility with 'comments' module
 	 * (has been extracted from sapphire/trunk in 12/2010).
-	 * 
+	 *
 	 * @return Form
 	 */
 	function PageComments() {
 		if($this->hasMethod('CommentsForm')) return $this->CommentsForm();
 		else if(method_exists('Page_Controller', 'PageComments')) return parent::PageComments();
 	}
-		
+
 }
